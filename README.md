@@ -23,5 +23,5 @@ This add-on utilizes your webcam and advanced hand tracking technology (MediaPip
 ### Usage
 - First time usage requires installing dependencies. The tool auto-installs for you with one click (this process may take a minute depending on your system).
 - Make sure you selected the correct camera and that it has a big enough FOV.
-- Click "START"
+- Click `START`
 - Follow the tooltip to use the gesture tracking!
