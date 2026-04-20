@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Gesture Tracking for Blender</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>3D Gesture Tracking</h1>
+            <p class="tagline">Control your Blender viewport in real-time using nothing but your hands!</p>
+            <p class="author">Created by Smaran Vallabhaneni</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Hero Section with GIF -->
+        <section class="hero">
+            <video class="media-video" autoplay muted loop>
+                <source src="gif.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <p class="description">
+                3D viewport control based on hand gestures for easy and fun viewing. This add-on utilizes your webcam and advanced hand tracking technology (MediaPipe) to translate specific hand gestures into camera movements within the Blender 3D viewport.
+            </p>
+            <div class="download-container">
+                <a href="https://github.com/happysmaran/3D-Gesture-Tracking/releases/download/1.0/3d_gesture_tracking.zip" class="download-btn" download>
+                    <span class="btn-icon">↓</span> Download v1.0
+                </a>
+            </div>
+        </section>
+
+        <!-- Gestures Section -->
+        <section class="gestures-section">
+            <div class="gestures-content">
+                <div class="gestures-list">
+                    <h2>Supported Gestures</h2>
+                    <div class="gesture-cards">
+                        <div class="card">
+                            <h3>Orbit</h3>
+                            <p>Point (index finger only)</p>
+                        </div>
+                        <div class="card">
+                            <h3>Zoom</h3>
+                            <p>Open palm</p>
+                        </div>
+                        <div class="card">
+                            <h3>Pan</h3>
+                            <p>Index + Middle fingers</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="gestures-image">
+                    <h2>Interface & Integration</h2>
+                    <img class="media-image" src="tool.png" alt="3D Gesture Tracking Tool Interface">
+                    <p>Seamlessly integrated as a panel in the Viewport Sidebar.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features & Requirements Section -->
+        <section class="details-section">
+            <div class="column">
+                <h2>Features</h2>
+                <ul>
+                    <li><strong>Intuitive Control:</strong> Maps natural hand gestures to complex camera actions (Orbit, Zoom, Pan).</li>
+                    <li><strong>Real-Time Tracking:</strong> Uses MediaPipe for high-accuracy, low-latency hand landmark detection.</li>
+                    <li><strong>Dynamic Feedback:</strong> Provides an (optional) live camera preview showing the hand skeleton and the detected gesture.</li>
+                    <li><strong>Easy Setup:</strong> Includes a dependency management system to automatically guide users through installing required libraries.</li>
+                </ul>
+            </div>
+            <div class="column">
+                <h2>Pre-requisites</h2>
+                <ul>
+                    <li><strong>Blender:</strong> Version 5.0 or newer.</li>
+                    <li><strong>Python Libraries:</strong> opencv, mediapipe, msvc-runtime (auto-installer available).</li>
+                    <li><strong>Operating System:</strong> Windows 8.1 or newer, macOS 11 Big Sur or newer.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Installation & Usage Section -->
+        <section class="guide-section">
+            <h2>Installation & Usage</h2>
+            <div class="guide-steps">
+                <div class="step-box">
+                    <h3>1. Install</h3>
+                    <ul>
+                        <li>Download the latest .zip from the releases.</li>
+                        <li>Drag-and-drop the .zip into the Blender viewport.</li>
+                        <li>Click <code>Ok</code> on the <code>Install from Disk</code> dialog.</li>
+                    </ul>
+                </div>
+                <div class="step-box">
+                    <h3>2. Setup</h3>
+                    <ul>
+                        <li>First time usage requires installing dependencies. The tool auto-installs for you with one click.</li>
+                        <li>Make sure you selected the correct camera and that it has a big enough FOV.</li>
+                    </ul>
+                </div>
+                <div class="step-box">
+                    <h3>3. Use</h3>
+                    <ul>
+                        <li>Click <code>START</code>.</li>
+                        <li>Follow the tooltip to use the gesture tracking!</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>3D Gesture Tracking Add-on for Blender v5.0.0</p>
+        </div>
+    </footer>
+</body>
+</html>

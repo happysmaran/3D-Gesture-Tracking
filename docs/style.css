@@ -1,0 +1,311 @@
+/* Color Palette & Basic Setup */
+:root {
+    --bg-color: #1a1a1c;
+    --panel-bg: #2b2b2e;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --accent-color: #ea7600; /* Blender Orange */
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header */
+header {
+    background: linear-gradient(135deg, #2b2b2e 0%, #1a1a1c 100%);
+    padding: 60px 0;
+    text-align: center;
+    border-bottom: 3px solid var(--accent-color);
+    box-shadow: var(--shadow);
+}
+
+header h1 {
+    margin: 0 0 10px 0;
+    font-size: 2.8rem;
+    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: -1px;
+}
+
+.tagline {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    margin: 0 0 10px 0;
+}
+
+.author {
+    font-size: 0.95rem;
+    color: var(--accent-color);
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Media Elements */
+.media-video,
+.media-image {
+    width: 100%;
+    max-width: 600px;
+    height: auto;
+    border-radius: var(--border-radius);
+    margin: 0 auto 20px auto;
+    box-shadow: var(--shadow);
+    display: block;
+}
+
+.media-video {
+    background-color: #111;
+    max-height: 360px;
+    object-fit: cover;
+}
+
+.description {
+    text-align: center;
+    font-size: 1.1rem;
+    max-width: 800px;
+    margin: 0 auto 50px auto;
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+/* Typography & Sections */
+section {
+    margin: 70px 0;
+}
+
+h2 {
+    color: var(--accent-color);
+    border-bottom: 2px solid #444;
+    padding-bottom: 12px;
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+}
+
+/* Cards for Gestures */
+.gestures-content {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+}
+
+.gestures-list {
+    flex: 1;
+    min-width: 300px;
+}
+
+.gestures-image {
+    flex: 1;
+    min-width: 300px;
+}
+
+.gestures-image .media-image {
+    max-width: 100%;
+    margin: 0 0 15px 0;
+}
+
+.gestures-image p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.gesture-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    height: 100%;
+    min-height: 583px;
+}
+
+.card {
+    background-color: var(--panel-bg);
+    padding: 35px 20px;
+    border-radius: var(--border-radius);
+    text-align: center;
+    border-left: 4px solid var(--accent-color);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.card:hover {
+    transform: translateX(4px);
+    box-shadow: var(--shadow);
+}
+
+.card h3 {
+    margin-top: 0;
+    color: #fff;
+    font-size: 1.2rem;
+}
+
+.card p {
+    color: var(--text-secondary);
+    margin: 8px 0 0 0;
+}
+
+/* Grid Layouts */
+.details-section,
+.guide-steps {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+
+.details-section .column {
+    flex: 1;
+    min-width: 300px;
+}
+
+.step-box {
+    background-color: var(--panel-bg);
+    padding: 25px;
+    border-radius: var(--border-radius);
+    flex: 1;
+    min-width: 250px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: box-shadow 0.3s ease;
+}
+
+.step-box:hover {
+    box-shadow: var(--shadow);
+}
+
+.step-box h3 {
+    color: var(--accent-color);
+    margin-top: 0;
+    font-size: 1.2rem;
+}
+
+ul {
+    padding-left: 20px;
+    margin: 15px 0;
+}
+
+li {
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+}
+
+li strong {
+    color: var(--text-primary);
+}
+
+code {
+    background-color: #111;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: var(--accent-color);
+    font-family: 'Courier New', monospace;
+    font-size: 0.95em;
+}
+
+/* Download Button */
+.download-container {
+    text-align: center;
+    margin: 30px 0;
+}
+
+.download-btn {
+    display: inline-block;
+    padding: 14px 32px;
+    background-color: var(--accent-color);
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: var(--border-radius);
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(234, 118, 0, 0.3);
+    border: 2px solid var(--accent-color);
+}
+
+.download-btn:hover {
+    background-color: #ff8c00;
+    border-color: #ff8c00;
+    box-shadow: 0 6px 16px rgba(234, 118, 0, 0.5);
+    transform: translateY(-2px);
+}
+
+.download-btn:active {
+    transform: translateY(0);
+}
+
+.btn-icon {
+    margin-right: 8px;
+    font-weight: 700;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 30px 0;
+    background-color: var(--panel-bg);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 80px;
+    border-top: 1px solid #444;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 2rem;
+    }
+
+    .tagline {
+        font-size: 1rem;
+    }
+
+    .gestures-content {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .gestures-list,
+    .gestures-image {
+        min-width: 100%;
+    }
+
+    .gesture-cards {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .details-section,
+    .guide-steps {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .details-section .column,
+    .step-box {
+        min-width: 100%;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    section {
+        margin: 40px 0;
+    }
+}
