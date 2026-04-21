@@ -145,25 +145,79 @@ _FINGER_DEFS = {
     'pinky': (20, 17, 18),
 }
 
-HYSTERESIS_MARGIN = 0.18
-MIN_CONFIDENCE = 0.28
+HYSTERESIS_MARGIN = 0.25
+MIN_CONFIDENCE = 0.35
 
 
 def _lv(lm, i):
     return Vector((lm[i].x, lm[i].y, lm[i].z))
 
 
+def _hand_scale(lm):
+    """Estimate hand scale as wrist-to-middle-MCP distance for normalization."""
+    wrist = _lv(lm, 0)
+    mid_mcp = _lv(lm, 9)
+    d = (mid_mcp - wrist).length
+    return d if d > 1e-4 else 0.1
+
+
+def _angle_at_pip_2d(lm, mcp_i, pip_i, tip_i):
+    """
+    Compute the bend angle at the PIP joint using only x,y — stable on
+    low-end webcams where MediaPipe z is noisy.
+    Returns degrees: ~180 = fully straight, ~90 or below = curled.
+    """
+    import math
+    mcp = Vector((_lv(lm, mcp_i).x, _lv(lm, mcp_i).y, 0.0))
+    pip = Vector((_lv(lm, pip_i).x, _lv(lm, pip_i).y, 0.0))
+    tip = Vector((_lv(lm, tip_i).x, _lv(lm, tip_i).y, 0.0))
+    v1 = mcp - pip
+    v2 = tip - pip
+    l1, l2 = v1.length, v2.length
+    if l1 < 1e-5 or l2 < 1e-5:
+        return 90.0
+    cos_a = max(-1.0, min(1.0, v1.dot(v2) / (l1 * l2)))
+    return math.degrees(math.acos(cos_a))
+
+
 def _finger_scores(lm):
     wrist = _lv(lm, 0)
+    scale = _hand_scale(lm)
     out = {}
     for name, (tip_i, mcp_i, pip_i) in _FINGER_DEFS.items():
         tip = _lv(lm, tip_i)
         mcp = _lv(lm, mcp_i)
         pip = _lv(lm, pip_i)
-        d_mcp = (mcp - wrist).length
-        curl = ((tip - wrist).length / d_mcp) if d_mcp > 1e-4 else 1.0
-        past_pip = (tip - wrist).length > (pip - wrist).length
-        out[name] = (curl, curl > 0.95 and past_pip)
+        # Normalize distances by hand scale so curl is stable regardless of
+        # how far the hand is from the camera.
+        d_tip = (tip - wrist).length / scale
+        d_mcp = (mcp - wrist).length / scale
+        curl = (d_tip / d_mcp) if d_mcp > 1e-4 else 1.0
+
+        # 2D PIP angle: reliable when finger is in profile to camera.
+        pip_angle = _angle_at_pip_2d(lm, mcp_i, pip_i, tip_i)
+        angle_extended = pip_angle > 150.0
+
+        # Foreshortening fallback: when a finger points straight at the
+        # camera its 2D projection collapses — tip, PIP and MCP all appear
+        # near the same pixel so the angle becomes unreliable (~90°).
+        # In that case, use the 3D tip-to-wrist distance ratio as the
+        # extension vote instead.  We trust it when:
+        #   • curl is clearly high (tip far from wrist relative to MCP), AND
+        #   • the 2D vectors are actually too short to trust (foreshortened),
+        #     i.e. angle is ambiguous rather than actively showing curl.
+        mcp2d = Vector((_lv(lm, mcp_i).x, _lv(lm, mcp_i).y, 0.0))
+        pip2d = Vector((_lv(lm, pip_i).x, _lv(lm, pip_i).y, 0.0))
+        tip2d = Vector((_lv(lm, tip_i).x, _lv(lm, tip_i).y, 0.0))
+        v_mcp_pip_len = (mcp2d - pip2d).length
+        v_pip_tip_len = (pip2d - tip2d).length
+        # Foreshortened when the 2D finger segments are very short relative
+        # to the hand scale (finger is pointing into/out of the camera).
+        foreshortened = (v_mcp_pip_len + v_pip_tip_len) < (scale * 0.25)
+        curl_extended = curl > 1.1 and foreshortened
+
+        extended = angle_extended or curl_extended
+        out[name] = (curl, extended)
     return out
 
 
@@ -172,32 +226,31 @@ def _pinch_dist(lm):
 
 
 def _score_orbit(lm, fs):
-    # Orbit gestures:
-    #   pan - needs index+middle both up
-    #   zoom - needs ALL four or more fingers up
-    #   orbit - needs ONLY index up, rest down
-    idx_curl, _ = fs['index']
-    mid_curl, _ = fs['middle']
+    # Orbit: ONLY index finger clearly extended, all others curled.
+    idx_curl, idx_past_pip = fs['index']
+    mid_curl, mid_past_pip = fs['middle']
     rng_curl, _ = fs['ring']
     pky_curl, _ = fs['pinky']
 
-    # Index must be clearly extended
-    idx_ext = min(1.0, max(0.0, (idx_curl - 0.80) / 0.35))
-    if idx_ext < 0.5:
+    # Index must be clearly extended AND tip past pip (truly pointing)
+    idx_ext = min(1.0, max(0.0, (idx_curl - 0.90) / 0.30))
+    if idx_ext < 0.5 or not idx_past_pip:
         return 0.0
 
     score = idx_ext
 
-    # Middle must be clearly curled — this is the key separator from pan.
-    # If middle is up at all, score collapses toward zero.
-    mid_ext = min(1.0, max(0.0, (mid_curl - 0.70) / 0.35))
-    score -= 0.7 * mid_ext
+    # Middle must be clearly curled — strongest separator from pan.
+    # Use both curl ratio AND past_pip: if middle tip is past pip, it's up.
+    mid_ext = min(1.0, max(0.0, (mid_curl - 0.75) / 0.30))
+    if mid_past_pip:
+        mid_ext = max(mid_ext, 0.8)
+    score -= 0.85 * mid_ext
 
-    # Ring and pinky curled is nice to have but less critical
-    rng_ext = min(1.0, max(0.0, (rng_curl - 0.75) / 0.35))
-    pky_ext = min(1.0, max(0.0, (pky_curl - 0.75) / 0.35))
-    score -= 0.15 * rng_ext
-    score -= 0.15 * pky_ext
+    # Ring and pinky curled also required
+    rng_ext = min(1.0, max(0.0, (rng_curl - 0.80) / 0.30))
+    pky_ext = min(1.0, max(0.0, (pky_curl - 0.80) / 0.30))
+    score -= 0.20 * rng_ext
+    score -= 0.20 * pky_ext
 
     return max(0.0, score)
 
@@ -216,12 +269,17 @@ def _score_zoom(lm, fs):
 
 
 def _score_pan(lm, fs):
-    idx_curl, _ = fs['index']
-    mid_curl, _ = fs['middle']
+    idx_curl, idx_past_pip = fs['index']
+    mid_curl, mid_past_pip = fs['middle']
     rng_curl, _ = fs['ring']
     pky_curl, _ = fs['pinky']
-    up = (min(1.0, max(0.0, (idx_curl - 0.85) / 0.4)) * 0.5 +
-          min(1.0, max(0.0, (mid_curl - 0.85) / 0.4)) * 0.5)
+    # Both index AND middle must be clearly extended (and tip past pip)
+    idx_up = min(1.0, max(0.0, (idx_curl - 0.85) / 0.4))
+    mid_up = min(1.0, max(0.0, (mid_curl - 0.85) / 0.4))
+    if not idx_past_pip or not mid_past_pip:
+        idx_up *= 0.3
+        mid_up *= 0.3
+    up = idx_up * 0.5 + mid_up * 0.5
     down = (min(1.0, max(0.0, (0.90 - rng_curl) / 0.3)) * 0.5 +
             min(1.0, max(0.0, (0.90 - pky_curl) / 0.3)) * 0.5)
     score = (up + down) * 0.5
@@ -243,7 +301,7 @@ class GestureClassifier:
             'zoom': _score_zoom(lm, fs),
             'pan': _score_pan(lm, fs),
         }
-        alpha = 0.4
+        alpha = 0.2  # slower smoothing → less noise jitter in gesture scores
         for g in self._ss:
             self._ss[g] = self._ss[g] * (1.0 - alpha) + raw[g] * alpha
 
@@ -272,9 +330,17 @@ class GestureClassifier:
         return dict(self._ss)
 
 
-def _palm_z(lm):
-    knuckles = [0, 5, 9, 13, 17]
-    return -sum(lm[i].z for i in knuckles) / len(knuckles)
+def _palm_size(lm):
+    """
+    2D wrist-to-middle-MCP distance (image plane only, no z).
+    Grows reliably as hand moves toward the camera — works on any webcam.
+    Larger = hand is closer/bigger in frame.
+    """
+    wrist = _lv(lm, 0)
+    mid_mcp = _lv(lm, 9)
+    dx = wrist.x - mid_mcp.x
+    dy = wrist.y - mid_mcp.y
+    return (dx * dx + dy * dy) ** 0.5
 
 
 def _palm_center(lm):
@@ -307,12 +373,12 @@ class TrackingThread(threading.Thread):
         self._cv2 = None
         self._mp = None
 
-        self._wrist_f = EMAFilter(alpha=0.3)
-        self._thumb_f = EMAFilter(alpha=0.3)
-        self._index_f = EMAFilter(alpha=0.3)
-        self._palm_z_f = EMAScalar(alpha=0.2)
-        self._palm_x_f = EMAScalar(alpha=0.3)
-        self._palm_y_f = EMAScalar(alpha=0.3)
+        self._wrist_f = EMAFilter(alpha=0.2)
+        self._thumb_f = EMAFilter(alpha=0.2)
+        self._index_f = EMAFilter(alpha=0.2)
+        self._palm_z_f = EMAScalar(alpha=0.18)  # palm_size filter (was palm_z)
+        self._palm_x_f = EMAScalar(alpha=0.2)
+        self._palm_y_f = EMAScalar(alpha=0.2)
         self._gesture_clf = GestureClassifier()
 
     def _push(self, pkt):
@@ -347,7 +413,7 @@ class TrackingThread(threading.Thread):
         thumb = self._thumb_f.update(_lv(lm, 4))
         index = self._index_f.update(_lv(lm, 8))
         gesture = self._gesture_clf.classify(lm)
-        palm_z = self._palm_z_f.update(_palm_z(lm))
+        palm_z = self._palm_z_f.update(_palm_size(lm))
         px, py = _palm_center(lm)
         palm_x = self._palm_x_f.update(px)
         palm_y = self._palm_y_f.update(py)
@@ -371,7 +437,13 @@ class TrackingThread(threading.Thread):
                         (10, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1)
 
             rgba = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2RGBA)
-            rgba = cv2.flip(rgba, 0)
+            # Blender's image origin is bottom-left; OpenCV's is top-left.
+            # V4L2 (Linux) and DirectShow (Windows) both need a vertical flip
+            # to correct this.  AVFoundation (macOS) delivers frames already
+            # in the orientation Blender expects, so flipping there produces
+            # an upside-down preview.
+            if platform.system() != "Darwin":
+                rgba = cv2.flip(rgba, 0)
             rgba_bytes = rgba.tobytes()
             if platform.system() != "Darwin":
                 dbg = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
@@ -436,54 +508,91 @@ class TrackingThread(threading.Thread):
             running_mode=mp_vision.RunningMode.LIVE_STREAM,
             result_callback=_on_result,
             num_hands=1,
-            min_hand_detection_confidence=0.7,
+            # Lower detection threshold so a foreshortened/side-lit hand
+            # doesn't fall out of detection and trigger re-detection each frame.
+            # Tracking threshold is higher — once found, hold on tightly.
+            min_hand_detection_confidence=0.5,
             min_hand_presence_confidence=0.5,
-            min_tracking_confidence=0.5,
+            min_tracking_confidence=0.6,
         )
 
         had_hand = False
+        # Frames of consecutive no-detection before we reset EMA state.
+        # Larger value = more tolerance for momentary occlusion / bright bleed.
+        MISS_GRACE = 10
+        miss_count = 0
+
+        # Strictly monotonic timestamp counter for MediaPipe LIVE_STREAM.
+        # time.time() can go backwards on NTP adjustments; that causes MediaPipe
+        # to silently drop frames, which shows up as random tracking cuts.
+        _ts_counter = 0
+
+        # CLAHE equalizer — normalises local contrast so bright corner
+        # bleed-in doesn't wash out the hand and confuse the detector.
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
         with mp_vision.HandLandmarker.create_from_options(options) as detector:
             while not self.stop_event.is_set():
                 ret, frame = cap.read()
                 if not ret:
+                    # Webcam hiccup — brief sleep and retry instead of spinning.
+                    time.sleep(0.005)
                     continue
 
                 frame = cv2.flip(frame, 1)
+
+                # Apply CLAHE per-channel in LAB space so colour is preserved.
+                # This evens out blown-out bright corners without darkening the hand.
+                lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+                l, a, b = cv2.split(lab)
+                l = clahe.apply(l)
+                frame = cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2BGR)
+
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 h, w = frame.shape[:2]
 
-                ts = int(time.time() * 1000)
-                # Keep a named reference so the Image isn't GC'd before the
-                # async callback fires (detect_async holds a raw C++ pointer
-                # into the buffer; dropping the object early → crash on macOS).
+                # Monotonic ms counter — MediaPipe requires strictly increasing ts.
+                _ts_counter += 1
+                ts = _ts_counter
+
+                # Keep mp_img alive until after we've read the callback result.
+                # detect_async holds a raw C++ pointer into the buffer; dropping
+                # the Python object before the callback fires → crash / missed frames.
                 mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
                 detector.detect_async(mp_img, ts)
-                del mp_img
 
                 with _cb_lock:
                     result = _cb_result[0]
+                # Safe to release now that we've captured the result reference.
+                del mp_img
 
                 if result and result.hand_landmarks:
                     lm = result.hand_landmarks[0]
                     self._push(self._process(lm, rgb, w, h))
                     had_hand = True
+                    miss_count = 0
                 else:
                     if had_hand:
-                        self._reset_filters()
-                        had_hand = False
+                        miss_count += 1
+                        if miss_count >= MISS_GRACE:
+                            # Only reset after several consecutive misses —
+                            # avoids filter reset from a single dropped frame.
+                            self._reset_filters()
+                            had_hand = False
+                            miss_count = 0
                     if self.show_preview:
                         rgba = cv2.cvtColor(rgb, cv2.COLOR_RGB2RGBA)
-                        rgba = cv2.flip(rgba, 0)
+                        if platform.system() != "Darwin":
+                            rgba = cv2.flip(rgba, 0)
                         self._push(self._make_pkt(None, None, None, None, None, None, None,
                                                  rgba.tobytes(), w, h, None))
 
 
 # Viewport / Modal / Panel
 
-_DELTA_DEAD = 0.003
+_DELTA_DEAD = 0.006  # larger dead-zone to suppress hand tremor / tracking noise
 _ORBIT_SCALE = 3.5
-_ZOOM_SCALE = 3.0
+_ZOOM_SCALE = 8.0  # palm_size (2D) has larger range than the old z-depth metric
 _PAN_SCALE = 0.8
 
 
