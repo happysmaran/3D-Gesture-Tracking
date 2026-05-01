@@ -54,54 +54,50 @@ def ensure_dependencies():
         target = _deps_target_dir()
         _ensure_target_on_path(target)
 
-        # Check first — avoids nuking the dir when packages are already installed and importable.
         if _check_deps():
             _deps_ok = True
             return True, "Dependencies already satisfied."
 
-        # Only wipe-and-recreate when needed.
-        if os.path.exists(target):
-            try:
-                shutil.rmtree(target)
-            except Exception as e:
-                print(f"[Hand Control] Warning: Could not fully clean deps dir: {e}")
         os.makedirs(target, exist_ok=True)
-        _ensure_target_on_path(target)
+        
+        addon_dir = os.path.dirname(__file__)
+        sys_platform = platform.system()
+        
+        if sys_platform == "Windows": # Windows
+            wheels_path = os.path.join(addon_dir, "wheels", "windows")
+            packages = ["opencv-python", "mediapipe", "protobuf==4.25.6", "msvc-runtime"]
+        elif sys_platform == "Darwin": # macOS
+            wheels_path = os.path.join(addon_dir, "wheels", "macos")
+            packages = ["opencv-python", "mediapipe", "protobuf==4.25.6"]
+        else:
+            return False, f"Unsupported platform: {sys_platform}"
+
+        if not os.path.exists(wheels_path):
+            return False, f"Wheels folder missing at: {wheels_path}"
 
         py = sys.executable
-        packages = ["opencv-python"]
-
-        if platform.system() == "Windows":
-            packages.append("msvc-runtime")
-
-        packages.append("protobuf==4.25.6")
-        packages.append("mediapipe")
-
-        for pkg in packages:
-            try:
-                print(f"[Hand Control] Installing {pkg} ...")
-                subprocess.check_call(
-                    [py, "-m", "pip", "install", "--quiet",
-                     "--no-warn-script-location", "--target", target, pkg],
-                    timeout=300,
-                )
-            except subprocess.CalledProcessError as exc:
-                return False, f"Failed to install {pkg}: {exc}"
-            except subprocess.TimeoutExpired:
-                return False, f"Timed out installing {pkg}."
+        try:
+            print(f"[Hand Control] Installing wheels for {sys_platform}...")
+            # Use --no-index to force local installation from the wheels folder
+            subprocess.check_call(
+                [py, "-m", "pip", "install", 
+                 "--no-index", 
+                 "--find-links", wheels_path,
+                 "--target", target, 
+                 *packages],
+                timeout=600,
+            )
+        except subprocess.CalledProcessError as exc:
+            return False, f"Wheel installation failed: {exc}"
 
         import importlib
         importlib.invalidate_caches()
 
         if not _check_deps():
-            return False, (
-                "Packages installed but import still fails.\n"
-                f"Target dir: {target}\n"
-                "Restart Blender completely (run as Administrator on Windows)."
-            )
+            return False, "Dependencies installed but import still fails."
 
         _deps_ok = True
-        return True, "✅ Dependencies installed successfully."
+        return True, "Platform dependencies installed."
 
 
 # Smoothing, GestureClassifier, geometry helpers
